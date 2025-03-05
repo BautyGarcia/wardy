@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:wardy/core/constants/app_constants.dart';
-import 'package:wardy/core/utils/database_helper.dart';
 import 'package:wardy/features/wardrobe/models/clothing_item.dart';
+import 'package:wardy/features/wardrobe/services/supabase_wardrobe_service.dart';
 
 class WardrobeProvider extends ChangeNotifier {
-  final DatabaseHelper _databaseHelper = DatabaseHelper();
+  final SupabaseWardrobeService _wardrobeService = SupabaseWardrobeService();
 
   List<ClothingItem> _allClothingItems = [];
   List<ClothingItem> _filteredClothingItems = [];
@@ -27,46 +28,43 @@ class WardrobeProvider extends ChangeNotifier {
     _setLoading(false);
   }
 
-  // Load all clothing items from database
+  // Load all clothing items from Supabase
   Future<void> _loadClothingItems() async {
-    final clothingItemsMap = await _databaseHelper.getClothingItems();
-    _allClothingItems =
-        clothingItemsMap.map((item) => ClothingItem.fromMap(item)).toList();
+    _allClothingItems = await _wardrobeService.loadItems();
     notifyListeners();
   }
 
   // Add a new clothing item
-  Future<void> addClothingItem(ClothingItem clothingItem) async {
+  Future<void> addClothingItem({
+    required XFile imageFile,
+    required String name,
+    required String category,
+  }) async {
     _setLoading(true);
-    final id = await _databaseHelper.insertClothingItem(clothingItem.toMap());
-    final newItem = clothingItem.copyWith(id: id);
-    _allClothingItems.add(newItem);
-    _filterItems();
-    _setLoading(false);
-  }
-
-  // Update an existing clothing item
-  Future<void> updateClothingItem(ClothingItem clothingItem) async {
-    _setLoading(true);
-    await _databaseHelper.updateClothingItem(clothingItem.toMap());
-
-    final index = _allClothingItems.indexWhere(
-      (item) => item.id == clothingItem.id,
+    final newItem = await _wardrobeService.addItem(
+      imageFile: imageFile,
+      name: name,
+      category: category,
     );
-    if (index != -1) {
-      _allClothingItems[index] = clothingItem;
+
+    if (newItem != null) {
+      _allClothingItems.add(newItem);
+      _filterItems();
     }
 
-    _filterItems();
     _setLoading(false);
   }
 
   // Delete a clothing item
-  Future<void> deleteClothingItem(int id) async {
+  Future<void> deleteClothingItem(String id) async {
     _setLoading(true);
-    await _databaseHelper.deleteClothingItem(id);
-    _allClothingItems.removeWhere((item) => item.id == id);
-    _filterItems();
+    final success = await _wardrobeService.deleteItem(id);
+
+    if (success) {
+      _allClothingItems.removeWhere((item) => item.id == id);
+      _filterItems();
+    }
+
     _setLoading(false);
   }
 
@@ -82,14 +80,6 @@ class WardrobeProvider extends ChangeNotifier {
     _filterItems();
   }
 
-  // Toggle favorite status of a clothing item
-  Future<void> toggleFavorite(ClothingItem clothingItem) async {
-    final updatedItem = clothingItem.copyWith(
-      isFavorite: !clothingItem.isFavorite,
-    );
-    await updateClothingItem(updatedItem);
-  }
-
   // Filter items based on current category and search query
   void _filterItems() {
     _filteredClothingItems =
@@ -101,8 +91,7 @@ class WardrobeProvider extends ChangeNotifier {
           // Then filter by search query if needed
           final searchMatch =
               _searchQuery.isEmpty ||
-              item.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-              item.brand.toLowerCase().contains(_searchQuery.toLowerCase());
+              item.name.toLowerCase().contains(_searchQuery.toLowerCase());
 
           return categoryMatch && searchMatch;
         }).toList();

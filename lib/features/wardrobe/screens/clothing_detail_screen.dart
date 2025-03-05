@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:wardy/features/wardrobe/models/clothing_item.dart';
+import 'package:wardy/features/wardrobe/widgets/clothing_image.dart';
 import 'package:wardy/theme/app_theme.dart';
 
 class ClothingDetailScreen extends StatelessWidget {
@@ -38,7 +39,7 @@ class ClothingDetailScreen extends StatelessWidget {
                     bottomLeft: Radius.circular(24),
                     bottomRight: Radius.circular(24),
                   ),
-                  child: _buildImage(theme),
+                  child: ClothingImage(item: item, fit: BoxFit.cover),
                 ),
               ),
             ),
@@ -297,37 +298,6 @@ class ClothingDetailScreen extends StatelessWidget {
       'December',
     ];
     return '${months[date.month - 1]} ${date.day}, ${date.year}';
-  }
-
-  Widget _buildImage(ThemeData theme) {
-    try {
-      final file = File(item.imagePath);
-      if (file.existsSync()) {
-        return Image.file(
-          file,
-          fit: BoxFit.cover,
-          errorBuilder:
-              (context, error, stackTrace) => _buildErrorPlaceholder(theme),
-        );
-      } else {
-        return _buildErrorPlaceholder(theme);
-      }
-    } catch (e) {
-      return _buildErrorPlaceholder(theme);
-    }
-  }
-
-  Widget _buildErrorPlaceholder(ThemeData theme) {
-    return Container(
-      color: theme.colorScheme.surface,
-      child: Center(
-        child: PhosphorIcon(
-          PhosphorIcons.tShirt(),
-          size: 80,
-          color: theme.colorScheme.onSurface.withOpacity(0.2),
-        ),
-      ),
-    );
   }
 
   void _showDeleteConfirmation(BuildContext context) {

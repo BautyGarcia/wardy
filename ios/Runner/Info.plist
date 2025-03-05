@@ -45,5 +45,14 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!-- Camera permission -->
+	<key>NSCameraUsageDescription</key>
+	<string>This app needs camera access to take photos of your clothing items</string>
+	<!-- Photo library permission -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app needs access to your photo library to select images of your clothing items</string>
+	<!-- Microphone permission (may be needed by the image_picker) -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>This app needs microphone access to record videos of your clothing items</string>
 </dict>
 </plist>

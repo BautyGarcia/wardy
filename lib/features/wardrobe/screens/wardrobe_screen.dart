@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:wardy/core/constants/app_constants.dart';
+import 'package:wardy/core/utils/permission_manager.dart';
 import 'package:wardy/features/wardrobe/models/clothing_item.dart';
 import 'package:wardy/features/wardrobe/screens/clothing_detail_screen.dart';
-import 'package:wardy/features/wardrobe/services/wardrobe_storage_service.dart';
+import 'package:wardy/features/wardrobe/services/supabase_wardrobe_service.dart';
 import 'package:wardy/features/wardrobe/widgets/add_clothing_form.dart';
 import 'package:wardy/features/wardrobe/widgets/clothing_item_card.dart';
+import 'package:wardy/features/wardrobe/widgets/loading_state.dart';
 import 'package:wardy/theme/app_theme.dart';
 
 class WardrobeScreen extends StatefulWidget {
@@ -17,12 +19,13 @@ class WardrobeScreen extends StatefulWidget {
 }
 
 class _WardrobeScreenState extends State<WardrobeScreen> {
-  final WardrobeStorageService _storageService = WardrobeStorageService();
+  final SupabaseWardrobeService _storageService = SupabaseWardrobeService();
   final ImagePicker _imagePicker = ImagePicker();
 
   String? _selectedCategory;
   List<ClothingItem> _items = [];
   bool _isLoading = true;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -33,14 +36,23 @@ class _WardrobeScreenState extends State<WardrobeScreen> {
   Future<void> _loadItems() async {
     setState(() {
       _isLoading = true;
+      _errorMessage = null;
     });
 
-    final items = await _storageService.getItemsByCategory(_selectedCategory);
+    try {
+      final items = await _storageService.getItemsByCategory(_selectedCategory);
 
-    setState(() {
-      _items = items;
-      _isLoading = false;
-    });
+      setState(() {
+        _items = items;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error loading items: $e');
+      setState(() {
+        _errorMessage = 'Failed to load items: $e';
+        _isLoading = false;
+      });
+    }
   }
 
   void _showAddClothingDialog() {
@@ -119,6 +131,20 @@ class _WardrobeScreenState extends State<WardrobeScreen> {
   }
 
   Future<void> _pickImage(ImageSource source) async {
+    bool hasPermission = false;
+
+    // Request appropriate permission based on source
+    if (source == ImageSource.camera) {
+      hasPermission = await PermissionManager.requestCameraPermission(context);
+    } else {
+      hasPermission = await PermissionManager.requestPhotosPermission(context);
+    }
+
+    // If permission not granted, return
+    if (!hasPermission) {
+      return;
+    }
+
     try {
       final pickedFile = await _imagePicker.pickImage(
         source: source,
@@ -172,10 +198,21 @@ class _WardrobeScreenState extends State<WardrobeScreen> {
     });
 
     try {
-      await _storageService.addItem(
+      final item = await _storageService.addItem(
         imageFile: imageFile,
         name: name,
         category: category,
+      );
+
+      if (item == null) {
+        throw Exception('Failed to add item');
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Item added successfully'),
+          backgroundColor: Theme.of(context).colorScheme.primary,
+        ),
       );
 
       await _loadItems();
@@ -203,7 +240,19 @@ class _WardrobeScreenState extends State<WardrobeScreen> {
     });
 
     try {
-      await _storageService.deleteItem(id);
+      final success = await _storageService.deleteItem(id);
+
+      if (!success) {
+        throw Exception('Failed to delete item');
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Item deleted successfully'),
+          backgroundColor: Theme.of(context).colorScheme.primary,
+        ),
+      );
+
       await _loadItems();
     } catch (e) {
       print('Error deleting clothing item: $e');
@@ -326,7 +375,9 @@ class _WardrobeScreenState extends State<WardrobeScreen> {
             Expanded(
               child:
                   _isLoading
-                      ? const Center(child: CircularProgressIndicator())
+                      ? const LoadingState(message: 'Loading your wardrobe...')
+                      : _errorMessage != null
+                      ? ErrorState(message: _errorMessage!, onRetry: _loadItems)
                       : _items.isEmpty
                       ? _buildEmptyState(theme)
                       : Padding(

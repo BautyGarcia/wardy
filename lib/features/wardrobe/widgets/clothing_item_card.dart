@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:wardy/features/wardrobe/models/clothing_item.dart';
+import 'package:wardy/features/wardrobe/widgets/clothing_image.dart';
 import 'package:wardy/theme/app_theme.dart';
 
 class ClothingItemCard extends StatelessWidget {
@@ -44,7 +45,7 @@ class ClothingItemCard extends StatelessWidget {
             fit: StackFit.expand,
             children: [
               // Image filling the entire card
-              _buildImage(theme),
+              ClothingImage(item: item, fit: BoxFit.cover),
 
               // Gradient overlay for better text visibility
               Positioned.fill(
